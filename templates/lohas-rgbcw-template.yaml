@@ -47,7 +47,6 @@ wifi:                                 # Set up a wifi access point using the dev
   ap:
     ssid: $devicename
   output_power: 17
-  fast_connect: true
 
 # In combination with the `ap` this allows the user
 # to provision wifi credentials to the device.
@@ -177,7 +176,7 @@ light:
           call.set_publish(false);
           call.set_save(false);
           call.perform();
-      - lambda:
+    - lambda:
         name: WLED DDP
         update_interval: 0s
         lambda: |-
