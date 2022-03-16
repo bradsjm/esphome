@@ -1,0 +1,239 @@
+# These substitutions allow the end user to override certain values
+substitutions:
+  name: "lohas-rgbcw"
+  friendly_name: "Lohas Bulb"
+  disable_entities: "true"
+
+# This should point to the public location of this yaml file.
+dashboard_import:
+  package_import_url: github://bradsjm/esphome/templates/lohas-rgbcw-template.yaml@main
+
+esphome:
+  name: $name
+  # Automatically add the mac address to the name
+  # so you can use a single firmware for all devices
+  name_add_mac_suffix: true
+
+  # This will allow for (future) project identification,
+  # configuration and updates.
+  project:
+    name: esphome.lohas-rgbcw-template
+    version: "1.0"
+
+  on_boot:
+    then:
+      - script.execute: script_default_fade
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+logger:                               # To be able to get logs from the device via serial and api
+  baud_rate: 0                        # Disable UART logging
+
+api:                                  # API is a requirement of the dashboard import
+  reboot_timeout: 0s
+
+mqtt:                                 # Enable MQTT
+  broker: 10.10.10.10
+  topic_prefix: esphome/${devicename}
+
+ota:                                  # OTA is required for Over-the-Air updating
+  on_error:
+    then:
+      - button.press: restart_button
+
+wifi:                                 # Set up a wifi access point using the device name above
+  ap:
+    ssid: $devicename
+  output_power: 17
+  fast_connect: true
+
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device.
+captive_portal:
+
+web_server:                           # web server allows access to device with a web browser
+
+button:
+  - platform: restart
+    id: restart_button
+    name: "${friendly_name} Restart"
+    entity_category: diagnostic
+    disabled_by_default: $disable_entities
+
+number:
+  - platform: template
+    name: "${friendly_name} Default Fade"
+    min_value: 0
+    max_value: 5000
+    step: 50
+    initial_value: 250
+    id: number_default_fade
+    entity_category: config
+    icon: mdi:timer-outline
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "ms"
+    mode: box
+    on_value:
+      - script.execute: script_default_fade
+
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    update_interval: 60s
+    entity_category: diagnostic
+    disabled_by_default: $disable_entities
+
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+    disabled_by_default: $disable_entities
+
+output:                                 # PWM outputs for each LED channel
+  - platform: esp8266_pwm
+    pin: GPIO5
+    frequency: 1000 Hz
+    id: pwm_red
+  - platform: esp8266_pwm
+    pin: GPIO4
+    frequency: 1000 Hz
+    id: pwm_green
+  - platform: esp8266_pwm
+    pin: GPIO13
+    frequency: 1000 Hz
+    id: pwm_blue
+  - platform: esp8266_pwm
+    pin: GPIO14
+    frequency: 1000 Hz
+    id: pwm_cw
+  - platform: esp8266_pwm
+    pin: GPIO12
+    frequency: 1000 Hz
+    id: pwm_ww
+
+light:
+- platform: gpio
+  id: lightbulb
+  default_transition_length: 250ms
+  name: $friendly_name
+  red: pwm_red
+  green: pwm_green
+  blue: pwm_blue
+  warm_white: pwm_ww
+  cold_white: pwm_cw
+  cold_white_color_temperature: 6000 K
+  warm_white_color_temperature: 2700 K
+  color_interlock: true
+  constant_brightness: true
+  effects:
+    - lambda:
+        name: E131
+        update_interval: 0s
+        lambda: |-
+          static int state = 0;
+          static float scaled_r = 0.0;
+          static float scaled_g = 0.0;
+          static float scaled_b = 0.0;
+          static ESPAsyncE131 e131(1); // 1 universe
+          
+          if (state == 0) {
+            if (e131.begin(E131_MULTICAST, 1, 1))
+              state = 1;
+            else
+              return;
+          }
+          
+          if (e131.isEmpty()) return;
+            
+          e131_packet_t packet;
+          e131.pull(&packet);
+          
+          float r = (float)packet.property_values[1]/255.0f;
+          float g = (float)packet.property_values[2]/255.0f;
+          float b = (float)packet.property_values[3]/255.0f;
+          
+          float m = 0.0f;
+          if ( (r>=g) && (r>=b) ) { m = r; }
+          else if ( g >= b )      { m = g; }
+          else                    { m = b; }
+          
+          if (m != 0.0f) {
+            scaled_r = r/m;
+            scaled_g = g/m;
+            scaled_b = b/m;
+          } else {
+            scaled_r = 0.0f;
+            scaled_g = 0.0f;
+            scaled_b = 0.0f;
+          }
+          auto call = id(lightbulb).turn_on();
+          call.set_transition_length(0);
+          call.set_brightness(m); 
+          call.set_color_mode(ColorMode::RGB);
+          call.set_rgb(scaled_r, scaled_g, scaled_b);
+          call.set_publish(false);
+          call.set_save(false);
+          call.perform();
+      - lambda:
+        name: WLED DDP
+        update_interval: 0s
+        lambda: |-
+          static float scaled_r = 0.0;
+          static float scaled_g = 0.0;
+          static float scaled_b = 0.0;
+          static std::unique_ptr<WiFiUDP> udp_;
+        
+          if (!udp_) {
+            udp_ = make_unique<WiFiUDP>();
+            if (!udp_->begin(4048)) {   // always listen on DDP port
+              return;
+            }
+          }
+          
+          std::vector<uint8_t> payload;
+          while (uint16_t packet_size = udp_->parsePacket()) {
+            payload.resize(packet_size);
+            if (!udp_->read(&payload[0], payload.size())) {
+              continue;
+            }
+          }
+      
+          if (payload.size() < 2) {
+            return;
+          }
+
+          float r = (float)payload[10]/255.0f;
+          float g = (float)payload[11]/255.0f;
+          float b = (float)payload[12]/255.0f;
+          
+          float m = 0.0f;
+          if ( (r>=g) && (r>=b) ) { m = r; }
+          else if ( g >= b )      { m = g; }
+          else                    { m = b; }
+          
+          if (m != 0.0f) {
+            scaled_r = r/m;
+            scaled_g = g/m;
+            scaled_b = b/m;
+          } else {
+            scaled_r = 0.0f;
+            scaled_g = 0.0f;
+            scaled_b = 0.0f;
+          }
+          auto call = id(lightbulb).turn_on();
+          call.set_transition_length(0);
+          call.set_brightness(m); 
+          call.set_color_mode(ColorMode::RGB);
+          call.set_rgb(scaled_r, scaled_g, scaled_b);
+          call.set_publish(false);
+          call.set_save(false);
+          call.perform();
+
+script:
+  - id: script_default_fade
+    then:
+      - delay: 1ms
+      - lambda: 'id(light)->set_default_transition_length(id(number_default_fade).state);'
