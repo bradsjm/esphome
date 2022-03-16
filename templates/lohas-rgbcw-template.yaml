@@ -35,7 +35,7 @@ api:                                  # API is a requirement of the dashboard im
 
 mqtt:                                 # Enable MQTT
   broker: 10.10.10.10
-  topic_prefix: esphome/${devicename}
+  topic_prefix: esphome/${name}
 
 ota:                                  # OTA is required for Over-the-Air updating
   on_error:
@@ -44,7 +44,7 @@ ota:                                  # OTA is required for Over-the-Air updatin
 
 wifi:                                 # Set up a wifi access point using the device name above
   ap:
-    ssid: $devicename
+    ssid: $name
   output_power: 17
 
 # In combination with the `ap` this allows the user
@@ -128,54 +128,6 @@ light:
     constant_brightness: true
     effects:
       - lambda:
-          name: E131
-          update_interval: 0s
-          lambda: |-
-            static int state = 0;
-            static float scaled_r = 0.0;
-            static float scaled_g = 0.0;
-            static float scaled_b = 0.0;
-            static ESPAsyncE131 e131(1); // 1 universe
-            
-            if (state == 0) {
-              if (e131.begin(E131_MULTICAST, 1, 1))
-                state = 1;
-              else
-                return;
-            }
-            
-            if (e131.isEmpty()) return;
-              
-            e131_packet_t packet;
-            e131.pull(&packet);
-            
-            float r = (float)packet.property_values[1]/255.0f;
-            float g = (float)packet.property_values[2]/255.0f;
-            float b = (float)packet.property_values[3]/255.0f;
-            
-            float m = 0.0f;
-            if ( (r>=g) && (r>=b) ) { m = r; }
-            else if ( g >= b )      { m = g; }
-            else                    { m = b; }
-            
-            if (m != 0.0f) {
-              scaled_r = r/m;
-              scaled_g = g/m;
-              scaled_b = b/m;
-            } else {
-              scaled_r = 0.0f;
-              scaled_g = 0.0f;
-              scaled_b = 0.0f;
-            }
-            auto call = id(lightbulb).turn_on();
-            call.set_transition_length(0);
-            call.set_brightness(m); 
-            call.set_color_mode(ColorMode::RGB);
-            call.set_rgb(scaled_r, scaled_g, scaled_b);
-            call.set_publish(false);
-            call.set_save(false);
-            call.perform();
-      - lambda:
           name: WLED DDP
           update_interval: 0s
           lambda: |-
@@ -234,4 +186,4 @@ script:
   - id: script_default_fade
     then:
       - delay: 1ms
-      - lambda: 'id(light)->set_default_transition_length(id(number_default_fade).state);'
+      - lambda: 'id(lightbulb)->set_default_transition_length(id(number_default_fade).state);'
