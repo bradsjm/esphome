@@ -1,9 +1,6 @@
 substitutions:
   name: "lohas-rgbcw"
   friendly_name: "Lohas Bulb"
-  disable_entities: "true"
-  mqtt_broker: "10.10.10.10"
-  default_transition: "1000"
 
 # This should point to the public location of this yaml file.
 dashboard_import:
@@ -11,86 +8,55 @@ dashboard_import:
 
 esphome:
   name: $name
-  # Automatically add the mac address to the name
-  # so you can use a single firmware for all devices
   name_add_mac_suffix: true
-
-  # This will allow for (future) project identification,
-  # configuration and updates.
   project:
     name: esphome.lohas-rgbcw-template
     version: "1.0"
-
-  on_boot:
-    then:
-      - script.execute: script_default_fade
 
 esp8266:
   board: esp01_1m
   restore_from_flash: true
 
-logger:                               # To be able to get logs from the device via serial and api
-  baud_rate: 0                        # Disable UART logging
+logger:                  # To be able to get logs from the device via serial and api
+  level: INFO
+  baud_rate: 0           # Disable UART logging
 
-api:                                  # API is a requirement of the dashboard import
+api:                     # API is a requirement of the dashboard import
   reboot_timeout: 0s
 
-mqtt:                                 # Enable MQTT
-  broker: $mqtt_broker
-  topic_prefix: esphome/${name}
-
-ota:                                  # OTA is required for Over-the-Air updating
+ota:                     # OTA is required for Over-the-Air updating
   on_error:
     then:
       - button.press: restart_button
 
-wifi:                                 # Set up a wifi access point using the device name above
+wifi:                    # Set up a wifi access point using the device name above
+  output_power: 17
   ap:
     ssid: $name
-  output_power: 17
 
-# In combination with the `ap` this allows the user
-# to provision wifi credentials to the device.
 captive_portal:
 
-web_server:                           # web server allows access to device with a web browser
+web_server:              # web server allows access to device with a web browser
 
 button:
   - platform: restart
     id: restart_button
     name: "${friendly_name} Restart"
     entity_category: diagnostic
-    disabled_by_default: $disable_entities
-
-number:
-  - platform: template
-    name: "${friendly_name} Default Fade"
-    min_value: 0
-    max_value: 5000
-    step: 50
-    initial_value: $default_transition
-    id: number_default_fade
-    entity_category: config
-    icon: mdi:timer-outline
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "ms"
-    mode: box
-    on_value:
-      - script.execute: script_default_fade
+    disabled_by_default: true
 
 sensor:
   - platform: uptime
     name: "${friendly_name} Uptime"
     update_interval: 60s
     entity_category: diagnostic
-    disabled_by_default: $disable_entities
+    disabled_by_default: true
 
   - platform: wifi_signal
     name: "${friendly_name} WiFi Signal"
     update_interval: 60s
     entity_category: diagnostic
-    disabled_by_default: $disable_entities
+    disabled_by_default: true
 
 output:                                 # PWM outputs for each LED channel
   - platform: esp8266_pwm
@@ -117,7 +83,7 @@ output:                                 # PWM outputs for each LED channel
 light:
   - platform: rgbww
     id: lightbulb
-    default_transition_length: ${default_transition}ms
+    default_transition_length: 1000ms
     name: $friendly_name
     red: pwm_red
     green: pwm_green
@@ -183,9 +149,3 @@ light:
             call.set_publish(false);
             call.set_save(false);
             call.perform();
-
-script:
-  - id: script_default_fade
-    then:
-      - delay: 1ms
-      - lambda: 'id(lightbulb)->set_default_transition_length(id(number_default_fade).state);'
