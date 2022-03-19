@@ -1,15 +1,17 @@
 substitutions:
-  name: "lohas-rgbcw"
+  name: "lohas-rgbww"
   friendly_name: "Lohas Bulb"
+  comment: "Lohas Bulb"
   disable_entities: "true"
 
 # This should point to the public location of this yaml file.
 dashboard_import:
-  package_import_url: github://bradsjm/esphome/templates/lohas-rgbcw-template.yaml
+  package_import_url: github://bradsjm/esphome/templates/lohas-rgbww-template.yaml
 
 esphome:
   name: $name
   name_add_mac_suffix: true
+  comment: $comment
   project:
     name: esphome.lohas-rgbww-template
     version: "1.0"

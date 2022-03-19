@@ -1,6 +1,7 @@
 substitutions:
   name: testlamp-c353d5
   friendly_name: "Test Lamp"
+  comment: "Test Lamp"
 
 packages:
   esphome.lohas-rgbww-template: !include templates/lohas-rgbww-template.yaml
