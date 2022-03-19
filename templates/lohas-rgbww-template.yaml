@@ -144,30 +144,37 @@ light:
           name: DDP
           update_interval: 0s
           lambda: |-
+            // statics in light effects are like globals in Arduino
             static float scaled_r = 0.0;
             static float scaled_g = 0.0;
             static float scaled_b = 0.0;
-            static std::unique_ptr<WiFiUDP> udp_;
+            static std::unique_ptr<WiFiUDP> ddp_udp;
           
-            if (!udp_) {
-              udp_ = make_unique<WiFiUDP>();
-              if (!udp_->begin(4048)) {   // always listen on DDP port
+            // allocate and start UDP
+            // this is like the start() in an Arduino sketch
+            if (!ddp_udp) {
+              ddp_udp = make_unique<WiFiUDP>();
+              if (!ddp_udp->begin(4048)) {   // always listen on DDP port
                 return;
               }
             }
             
+            // the rest is like the loop() in an Arduino sketch
+            // read UDP payload
             std::vector<uint8_t> payload;
-            while (uint16_t packet_size = udp_->parsePacket()) {
+            while (uint16_t packet_size = ddp_udp->parsePacket()) {
               payload.resize(packet_size);
-              if (!udp_->read(&payload[0], payload.size())) {
+              if (!ddp_udp->read(&payload[0], payload.size())) {
                 continue;
               }
             }
         
+            // ignore small payload
             if (payload.size() < 2) {
               return;
             }
-  
+
+            // do the thing
             float r = (float)payload[10]/255.0f;
             float g = (float)payload[11]/255.0f;
             float b = (float)payload[12]/255.0f;
