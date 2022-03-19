@@ -1,8 +1,6 @@
 substitutions:
   name: "lohas-rgbww"
-  friendly_name: "Lohas Bulb"
-  comment: "Lohas Bulb"
-  disable_entities: "true"
+  friendly_name: "Lohas RGBWW Bulb"
 
 # This should point to the public location of this yaml file.
 dashboard_import:
@@ -11,7 +9,7 @@ dashboard_import:
 esphome:
   name: $name
   name_add_mac_suffix: true
-  comment: $comment
+  comment: $friendly_name
   project:
     name: esphome.lohas-rgbww-template
     version: "1.0"
