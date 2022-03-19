@@ -1,6 +1,7 @@
 substitutions:
   name: "lohas-rgbcw"
   friendly_name: "Lohas Bulb"
+  disable_entities: "true"
 
 # This should point to the public location of this yaml file.
 dashboard_import:
@@ -10,7 +11,7 @@ esphome:
   name: $name
   name_add_mac_suffix: true
   project:
-    name: esphome.lohas-rgbcw-template
+    name: esphome.lohas-rgbww-template
     version: "1.0"
 
 esp8266:
@@ -18,7 +19,7 @@ esp8266:
   restore_from_flash: true
 
 logger:                  # To be able to get logs from the device via serial and api
-  level: INFO
+  level: DEBUG
   baud_rate: 0           # Disable UART logging
 
 api:                     # API is a requirement of the dashboard import
@@ -30,13 +31,16 @@ ota:                     # OTA is required for Over-the-Air updating
       - button.press: restart_button
 
 wifi:                    # Set up a wifi access point using the device name above
+  ap: {}
   output_power: 17
-  ap:
-    ssid: $name
 
 captive_portal:
 
 web_server:              # web server allows access to device with a web browser
+
+time:                    # sntp time client for daily power consumption
+  - platform: sntp
+    timezone: "America/New_York"
 
 button:
   - platform: restart
@@ -57,27 +61,45 @@ sensor:
     update_interval: 60s
     entity_category: diagnostic
     disabled_by_default: true
+    filters:
+      - delta: 5
+
+  - platform: template
+    id: power
+    name: "${friendly_name} Power Consumption"
+    unit_of_measurement: W
+    accuracy_decimals: 1
+    update_interval: 60s
+    device_class: power
+    state_class: measurement
+    icon: mdi:flash
+
+  - platform: total_daily_energy
+    name: "${friendly_name} Total Daily Energy"
+    power_id: power
+    filters:
+        # Multiplication factor from W to kW is 0.001
+        - multiply: 0.001
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    icon: mdi:flash
 
 output:                                 # PWM outputs for each LED channel
   - platform: esp8266_pwm
     pin: GPIO5
-    frequency: 1000 Hz
     id: pwm_red
   - platform: esp8266_pwm
     pin: GPIO4
-    frequency: 1000 Hz
     id: pwm_green
   - platform: esp8266_pwm
     pin: GPIO13
-    frequency: 1000 Hz
     id: pwm_blue
   - platform: esp8266_pwm
     pin: GPIO14
-    frequency: 1000 Hz
     id: pwm_cw
   - platform: esp8266_pwm
     pin: GPIO12
-    frequency: 1000 Hz
     id: pwm_ww
 
 light:
@@ -94,9 +116,29 @@ light:
     warm_white_color_temperature: 2700 K
     color_interlock: true
     constant_brightness: true
+    on_turn_on:
+      - sensor.template.publish:
+          id: power
+          state: !lambda 'return 6.0 * id(lightbulb).remote_values.get_brightness();'
+    on_state:
+      - sensor.template.publish:
+          id: power
+          state: !lambda 'return 6.0 * id(lightbulb).remote_values.get_brightness();'
+    on_turn_off:
+      - sensor.template.publish:
+          id: power
+          state: 0.2
     effects:
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 1s
+          update_interval: 2s
+      - pulse:
+          name: "Fast Pulse"
+          transition_length: 0.5s
+          update_interval: 0.5s
       - lambda:
-          name: WLED DDP
+          name: DDP
           update_interval: 0s
           lambda: |-
             static float scaled_r = 0.0;
