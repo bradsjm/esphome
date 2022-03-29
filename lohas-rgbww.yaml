@@ -1,12 +1,5 @@
-substitutions:
-  name: testlamp-c353d5
-  friendly_name: "Test Lamp"
-
 packages:
   esphome.lohas-rgbww-template: !include templates/lohas-rgbww-template.yaml
-
-esphome:
-  name_add_mac_suffix: false
 
 wifi:
   ssid: !secret wifi_ssid

@@ -1,6 +1,6 @@
 substitutions:
-  name: lohas-rgbww-c34e40
-  friendly_name: "Main Hallway Lamp 3"
+  name: lohas-rgbww-b702d5
+  friendly_name: "Main Hallway Lamp 2"
 
 packages:
   esphome.lohas-rgbww-template: github://bradsjm/esphome/templates/lohas-rgbww-template.yaml
